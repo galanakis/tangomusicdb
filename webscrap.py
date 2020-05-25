@@ -9,7 +9,7 @@ import pandas as pd
 # Input: a list of strings representing urls
 # Output: a single dataframe, containing the concatenated tables.
 def cat_tables_dataframe(*urls, table_index=0):
-    return pd.concat([pd.read_html(url)[table_index] for url in urls])
+    return pd.concat([pd.read_html(url)[table_index] for url in urls], ignore_index=True)
 
 
 # It performs transformations on the input df and returns the result.
