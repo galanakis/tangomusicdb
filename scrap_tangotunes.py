@@ -7,6 +7,8 @@ import re
 def get_df(url):
     #url = 'https://www.tangotunes.com/no-aflojes-39136-rp.html'
     soup = BeautifulSoup(requests.get(url).text)
+
+    title = soup.find('div',{'class':'product-name'}).h1.text
     data = soup.find_all('div',{'class':'additional-data'})[0]
     rows = data.find_all('div',{'class','row'})
     pairs = [[r.text.strip() for r in row.find_all('div')] for row in rows]
@@ -15,6 +17,7 @@ def get_df(url):
     print(url)
     print('----')
     df = pd.DataFrame(dict(pairs), index=[0])
+    df['Title'] = title
     print(df)
     return df
 
