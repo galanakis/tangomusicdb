@@ -14,7 +14,7 @@ import wget
 
 cache_dirname = os.path.join('todotango', 'cache')
 output_dirname = os.path.join('todotango')
-mp3_dirname = os.path.join("todotango","audio","mp3")
+mp3_dirname = os.path.join("todotango", "audio", "mp3")
 
 url_obras_todas = 'https://www.todotango.com/musica/obras/todas/-/0/0/'
 url_obras_musica = 'https://www.todotango.com/musica/obras/musica/-/0/0/'
@@ -299,6 +299,11 @@ def to_csv(df, fname, **kwargs):
     df.to_csv(fname, **kwargs)
 
 
+# Reads a csv file with all columns being strings.
+def read_csv(file_path):
+    return pd.read_csv(file_path, index_col=0, dtype=str)
+
+
 def analyze_all(links):
 
     # Generate a list of data frames, one for each theme
@@ -470,62 +475,51 @@ def correct(string, corrections):
     return string
 
 
-def typos_intrumentalists():
+instrumentalist_corrections = {
+    "Trio": "Trío",
+    "Bandoneon": "Bandoneón",
+    "bandoneon": "bandoneón",
+    "Quiteto": "Quinteto",
+    "\"": "",
+    "^\W+": "",
+    "\W+$": "",
+    "^Con ": "",
+    "de:": "de",
+    "dir. Por": "dir:",
+    "\W+[dD][iI][rR]\W+": " -dir: ",
+    "Conjunto -dir:": "Conjunto",
+    "Trío -dir:": "Trío",
+    "Cuartetango -dir:": "Cuartetango",
+    "Guitarras -dir:": "Guitarras",
+    "Orquesta -dir:": "Orquesta",
+    "dirigid[ao] por:": "-dir:",
+    "Dúo Dúo": "Dúo",
+    "Conjunto Conjunto": "Conjunto",
+    "Trío Trío": "Trío",
+    "Cuarteto Cuarteto": "Cuarteto",
+    "Orquesta Orquesta": "Orquesta",
+    "Cuarteto Típico Cuarteto Típico ": "",
+    "Orquesta Típica Porteña Raúl Garello": "Orquesta Típica Porteña -dir: Raúl Garello",
+    "Bandoneón (?!de)": "Bandoneón de ",
+    "Guitarra (?!de)" : "Guitarra de ",
+    "Guitarras (?!de)" : "Guitarras de ",
+    "Orquesta de cuerdas José Canet": "Orquesta de cuerdas de José Canet",
+    "Piano:": "Piano de",
+    "Orq\. ": "Orquesta ",
+    "^guitarra": "Guitarra",
+    "^orquesta": "Orquesta",
+    "Conjunto -dir:": "Conjunto",
+    "Orquesta -dir:": "Orquesta"
 
-    corrections = {
-
-        '*\-* *[Dd]ir: *': ' dir: ', 
-        '\"': '',
-        'de:': 'de',
-        '^ ': '',
-        '^. ': '',
-        ' be ': ' de ',
-        '.$' : '',
-        '\. *$': '',
-        'Orquesta - dir:': 'Orquesta:',
-        'Conjunto - dir:': 'Conjunto:',
-        'Trio ': 'Trío: ',
-        'Trío - dir:': 'Trío:',
-        'Guitarras - dir:': 'Guitarras:',
-        'Bandoneon': 'Bandoneón',
-        'bandoneon': 'bandoneón', 
-        'bandoneón y guitarra': 'guitarra y bandoneón',
-        'acompañamiento de piano y violín': 'piano y violín',
-        '^con': 'Con',
-        ' *$': '',
-        '$ ': '',
-        'Orq. ': 'Orquesta: ',
-        'Quiteto': 'Quinteto',
-        '^Bandoneón de': 'Bandoneón:',
-        '^Bandoneón ': 'Bandoneón: ',
-        '^Conjunto ': 'Conjunto: ',
-        '^Cuarteto ': 'Cuarteto: ',
-        '^Dúo': 'Dúo: ',
-        '^Guitarra de': 'Guitarra: ',
-        '^Guitarra ': 'Guitarra: ',
-        '^Guitarras de': 'Guitarras: ',
-        '^Guitarras ': 'Guitarras: ',
-        '^Orquesta ': 'Orquesta: ',
-        '^Piano de ': 'Piano: ',
-        '^Quinteto - dir:': 'Quinteto:',
-        '^Quinteto ': 'Quinteto: ',
-        '^Sexteto ': 'Sexteto: ',
-        '^Septeto ': 'Septeto: ',
-        '^Solo de bandoneón de ': 'Solo de bandoneón: ',
-        '^Solo de bandoneón ': 'Solo de bandoneón: ',
-        '^Solo de guitarra de ': 'Solo de guitarra de: ',
-        '^Solo de piano de ': 'Solo de piano: ',
-        '^Solo de piano ': 'Solo de piano: ',
-        '^Teclado de ': 'Teclado: ',
-        '^Trío ': 'Trío: ',
-        '^Con ': '',
-        '^Octeto ': 'Octeto: ',
-        '^Noneto ': 'Noneto: ',
-        '^Orquesta de cuerdas de ': 'Orquesta de cuerdas: ',
-        '^Orquesta de cuerdas ': 'Orquesta de cuerdas: '
+}
 
 
-    }
+def corrections_regex(string):
+
+    for original, replacement in instrumentalist_corrections.items():
+        string = re.sub(original, replacement, string)
+
+    return string
 
 
 # Here I apply my own bias by reordering and restructuring the data
@@ -554,7 +548,7 @@ def edit_data(df_orig):
         re_split_date = '(\d{0,2})-?(\d{0,2})-?(\d\d\d\d)'
         day, month, year = re.findall(re_split_date, date_string)[0]
         output = "-".join(list(map(lambda x: "%02d" % int(x), filter(None, list([year, month, day])))))
-        if (output == '1900-1-1'):
+        if (output == '1900-01-01'):
             output = None
         return output
 
@@ -580,20 +574,15 @@ def edit_data(df_orig):
     # always consistent.
     df['Instrumentalist'] = (df['Ensemble']+' '+df['Instrumentalist']).str.strip()
 
+    ind = df["Instrumentalist"].notnull()
+    df['Instrumentalist'] = df['Instrumentalist'][ind].apply(lambda x: corrections_regex(x))
 
-    # XXXXX
-    # Fix pandas type autoconversion, which happens at random.
-    df_edited['File ID']=df_edited['File ID'][df_edited['File ID'].notnull()].apply(lambda x: str(int(x)))
-    df_edited['Year of Composition']=df_edited['Year of Composition'][df_edited['Year of Composition'].notnull()].apply(lambda x: str(int(x)))
-    
-    df_edited = df_edited.drop_duplicates()
+    df = df.drop_duplicates()
 
     return df
 
 
-def label_mp3_files():
-
-    df = pd.read_csv("todotango/todotango.csv", index_col=0)
+def label_mp3_files(df):
 
     ind = df["File ID"].notnull()
     df_files = df[ind].copy()
@@ -609,11 +598,9 @@ def label_mp3_files():
     re_date = r'(\d\d\d\d)-?(\d{0,2})-?(\d{0,2})'
     df_files[["Year", "Month", "Day"]] = df_files["Date"].str.extract(re.compile(re_date))
 
-
     # The original data and also the regular expression extraction might result
     # in NaN which can cause issues with string manipulations.
     # Here we replaces all NaNs with empty strings.
-    
     df_files = df_files.fillna("")
 
     # List of files without a numeric ID in their name.
@@ -622,10 +609,9 @@ def label_mp3_files():
     # List of files, present in disk, but without associated data
     key_errors = []
 
-    for file_path in Path(mp3_dirname).rglob('*.mp3'):
-        filename = os.path.basename(file_path).replace('.mp3','')
+    for filename in Path(mp3_dirname).rglob('*.mp3'):
         try:
-            fileid = re.match('(\d+)', filename).group()
+            fileid = re.match('(\d+)', os.path.basename(filename)).group(1)
             print(filename)
             row = df_files.loc[fileid]
             title = "".join(filter(None, ['%-12s' % row["Date"], row["Title"]]))
@@ -636,11 +622,11 @@ def label_mp3_files():
 
             # Some files don't have ID3 tags!
             try:
-                tags = ID3(mp3_fname)
+                tags = ID3(filename)
             except ID3NoHeaderError:
-                ID3().save(mp3_fname)
+                ID3().save(filename)
 
-            audiofile = EasyID3(mp3_fname)
+            audiofile = EasyID3(filename)
             audiofile["title"] = title
             audiofile["artist"] = artist
             audiofile["date"] = row["Year"]
@@ -653,13 +639,13 @@ def label_mp3_files():
         # Files in disk but without associated data
         except KeyError:
             key_errors.append(filename)
-        
+
     print("-----------")
     print("The following files do not have a numeric id in their name")
-    print("  ",", ".join(attribute_errors))
+    print("  ", ", ".join(map(str,attribute_errors)))
     print()
-    print("The following files are in disk but there are not data for them")
-    print("  ", ", ".join(key_errors))
+    print("The following files are in disk but there is no data for them")
+    print("  ", ", ".join(map(str,key_errors)))
 
 
 
@@ -670,7 +656,7 @@ if __name__ == "__main__":
     # This can be slow as it reads all page source.
     df_todotango = analyze_all(links)
 
-    df_todotango.to_csv("todotango.csv", ignore_index=True)
+    df_todotango.to_csv("todotango/todotango_raw.csv", ignore_index=True)
 
     df_edited = edit_data(df_todotango)
 
@@ -692,10 +678,10 @@ if __name__ == "__main__":
         "File ID"
     ]
 
-    df_edited.to_csv("todotango.csv", columns=csv_cols)
+    df_edited.to_csv("todotango/todotango.csv", columns=csv_cols)
 
     download_audio_files()
 
-    label_mp3_files()
+    label_mp3_files(df_edited)
 
 
